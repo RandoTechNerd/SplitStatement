@@ -1,0 +1,19 @@
+# build output
+bin/
+obj/
+publish/
+
+# local data — never commit anyone's finances or secrets
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.vs/
+*.user
+
+# OS junk
+Thumbs.db
+.DS_Store
+._*

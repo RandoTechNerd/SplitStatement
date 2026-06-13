@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SplitStatement</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <a href="/" class="brand">
+    <img src="favicon.png" alt="Logo" class="brand-img"> SplitStatement
+  </a>
+  <div class="net" id="netBanner">…</div>
+  <div class="header-actions">
+    <div class="who">
+      I'm:
+      <button id="whoAryn" class="whobtn">Aryn</button>
+      <button id="whoMel" class="whobtn">Mel</button>
+    </div>
+    <button id="settingsBtn" class="settings-btn" title="Settings" aria-label="Settings">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.03 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1.03z"/></svg>
+    </button>
+    <a class="ghost" href="/api/export.xlsx" title="Download everything as an Excel workbook">⬇ Excel</a>
+  </div>
+</header>
+
+<main>
+  <section class="rail" id="cardRail">
+    <!-- Home tile will be inserted here by JS -->
+    <div id="cardList"></div>
+  </section>
+
+  <section class="panel" id="panel">
+    <div class="empty" id="emptyHint">Pick a card above ☝️</div>
+    
+    <!-- Home / Summary View -->
+    <div id="summaryView" hidden>
+      <div class="summary-header">
+        <h1>Overview</h1>
+        <div style="display:flex;gap:10px">
+          <button id="insightsBtn" class="ghost" hidden>💡 Insights</button>
+          <button id="addCardBtn" class="ghost">+ Add card</button>
+          <button id="batchScanBtn" class="primary">🔍 Scan Folder for Statements</button>
+        </div>
+      </div>
+      <div id="summaryNet" class="summary-net"></div>
+      <div id="summaryCards" class="summary-cards-grid"></div>
+      <h2 class="rq-title" id="reqTitle" hidden>⏳ Venmo requests outstanding</h2>
+      <div id="reqList" hidden></div>
+      <h2 class="rq-title">Needs review — all cards</h2>
+      <div id="reviewQueue"></div>
+    </div>
+
+    <!-- Card Detail View -->
+    <div id="cardView" hidden>
+      <div class="cardbar">
+        <div class="cardmeta">
+          <h2 id="cvName"></h2>
+          <input id="cvLast4" class="last4" maxlength="40" placeholder="•••• last 4(s)"
+                 title="Card number endings — match statement files automatically. Tag an owner (Aryn:11009 Mel:11017) and swipes on that number default to that person; the name stays hidden on the card.">
+          <select id="cvPayer" title="Who usually pays this card's bill">
+            <option value="Aryn">Aryn pays the bill</option>
+            <option value="Mel">Mel pays the bill</option>
+            <option value="Both">We each pay our part</option>
+          </select>
+        </div>
+        <div class="balbox">
+          <label title="The 'Current balance' from the bank's website — everything owed right now, not the frozen statement balance">Current balance&nbsp;$
+            <input id="cvBalance" type="number" step="0.01" placeholder="from the bank site">
+          </label>
+          <span id="cvDiscrepancy" class="chip"></span>
+        </div>
+      </div>
+
+      <div class="strategy-section">
+        <div class="strategy-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A4.5 4.5 0 0 0 13.5 3.5c-1.3 0-2.6.5-3.5 1.5-1.1 1-1.6 2.4-1.5 3.5.1 1.1.5 2.2 1.5 3.1.8.8 1.3 1.5 1.5 2.4"></path><path d="M9 18h6"></path><path d="M10 22h4"></path></svg>
+        </div>
+        <div class="strategy-content">
+          <div class="strategy-title">Card Strategy</div>
+          <div id="strategyTags" class="strategy-tags"></div>
+          <textarea id="cvNote" class="strategy-area" rows="1" placeholder="No notes yet — tap the pencil to add some." readonly></textarea>
+        </div>
+        <button id="stratEdit" class="strat-edit" title="Edit strategy" aria-label="Edit strategy"></button>
+      </div>
+
+      <div class="totalsbar" id="cvTotals"></div>
+
+      <div class="toolbar">
+        <div class="tool-group">
+          <label class="importbtn">📥 Import CSV / Excel
+            <input id="fileInput" type="file" multiple accept=".csv,.xlsx,.xls" hidden>
+          </label>
+          <button id="syncWebBtn" class="sync-btn" title="Paste charges from bank website to catch pending items">🔗 Sync from Bank Web</button>
+          <button id="catchupBtn" class="sync-btn" title="Mark old, already-paid charges as settled — for imports that go back months">🧹 Catch up…</button>
+          <button id="amzAryn" class="sync-btn amzbtn" title="Paste Aryn's Amazon transactions — matching charges toggle to Aryn">A+</button>
+          <button id="amzMel" class="sync-btn amzbtn" title="Paste Mel's Amazon transactions — matching charges toggle to Mel">M+</button>
+        </div>
+        <div class="filters">
+          <button data-view="open" class="filter active">Open</button>
+          <button data-view="review" class="filter">Needs review</button>
+          <button data-view="settled" class="filter">Settled</button>
+        </div>
+        <button id="settleBtn" class="primary">✅ Settle up…</button>
+      </div>
+
+      <div id="importMsg" class="importmsg" hidden></div>
+
+      <table class="txns">
+        <thead>
+          <tr><th>Date</th><th>Description</th><th class="thnote">Note</th>
+              <th class="num">Amount</th><th>Who</th><th></th></tr>
+        </thead>
+        <tbody id="txnBody"></tbody>
+      </table>
+
+      <div class="addrow">
+        <div class="add-inputs">
+            <input id="addDate" type="date">
+            <input id="addDesc" type="text" placeholder="Add charge manual…">
+            <input id="addAmount" type="number" step="0.01" placeholder="$" style="width:90px">
+            <button id="addBtn">Add</button>
+        </div>
+        <div class="memo-section">
+            <div class="memo-title">Split Memo</div>
+            <textarea id="stickyNoteArea" class="memo-area" placeholder="Split notes..."></textarea>
+        </div>
+      </div>
+
+      <details class="history">
+        <summary>Past settle-ups for this card</summary>
+        <div id="historyBody"></div>
+      </details>
+    </div>
+  </section>
+</main>
+
+<!-- settle modal -->
+<div class="modal" id="settleModal" hidden>
+  <div class="sheet">
+    <h3>Settle up — <span id="smCard"></span></h3>
+    <div id="smSummary" class="smsummary"></div>
+    <label>Cycle label <input id="smLabel" type="text" placeholder="e.g. 610"></label>
+    <h4>Payments (how it actually got paid)</h4>
+    <div id="smDetected" class="paychips"></div>
+    <div id="smPayments"></div>
+    <button id="smAddPay" class="ghost">+ add a payment line</button>
+    <label>Carry over to next cycle:
+      <span id="smCarryMelL">Mel</span> <input id="smCarryMel" type="number" step="0.01" value="0" style="width:80px">
+      <span id="smCarryArynL">Aryn</span> <input id="smCarryAryn" type="number" step="0.01" value="0" style="width:80px">
+    </label>
+    <label>Notes <textarea id="smNote" rows="2" placeholder="Settle notes..."></textarea></label>
+    <div class="smbtns">
+      <button id="smCancel" class="ghost">Cancel</button>
+      <button id="smConfirm" class="primary">Settle this card</button>
+    </div>
+  </div>
+</div>
+
+<!-- settings modal -->
+<div class="modal" id="settingsModal" hidden>
+  <div class="sheet">
+    <h3>Settings</h3>
+    <div class="settings-grid">
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700">Content Creator Mode</div>
+          <div style="font-size:12px;color:var(--muted)">Anonymize names for streaming</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="creatorModeToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700">Theme</div>
+          <div style="font-size:12px;color:var(--muted)">Choose your vibe</div>
+        </div>
+        <div class="theme-options">
+          <button data-theme="light" class="theme-btn" title="Light">☀️</button>
+          <button data-theme="dark" class="theme-btn" title="Dark">🌙</button>
+          <button data-theme="colorful" class="theme-btn" title="Colorful">🎨</button>
+          <button data-theme="neon" class="theme-btn" title="Neon">⚡</button>
+          <button data-theme="metallic" class="theme-btn" title="Metallic">💎</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700" id="bankArynLabel">Bank #1 — last 4</div>
+          <div style="font-size:12px;color:var(--muted)">Payments from this account get tagged with the payer</div>
+        </div>
+        <input type="text" id="bankAryn" maxlength="6" style="width:90px;text-align:center" placeholder="1234">
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700" id="bankMelLabel">Bank #2 — last 4</div>
+          <div style="font-size:12px;color:var(--muted)">Payments from this account get tagged with the payer</div>
+        </div>
+        <input type="text" id="bankMel" maxlength="6" style="width:90px;text-align:center" placeholder="5678">
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700">Creator mode blur list</div>
+          <div style="font-size:12px;color:var(--muted)">Transactions containing these words blur on stream (comma-separated)</div>
+        </div>
+        <input type="text" id="blurInput" style="width:200px" placeholder="fred hutch, kratom">
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700">Statement Folder</div>
+          <div style="font-size:12px;color:var(--muted)">Path to search for CSV files</div>
+        </div>
+        <input type="text" id="folderPathInput" style="width:200px" placeholder="C:\Users\...">
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700">Auto-archive after scan</div>
+          <div style="font-size:12px;color:var(--muted)">Move imported files into Archive\year\month so the folder stays clean</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <label class="toggle-switch"><input type="checkbox" id="archiveChk"><span class="slider"></span></label>
+          <select id="archiveNaming" style="width:210px" title="How to rename files as they're archived">
+            <option value="keep">Keep original name</option>
+            <option value="date">Date + name</option>
+            <option value="card">Card + name</option>
+            <option value="datecard">Date + Card + name</option>
+            <option value="datecard_replace">Date + Card (replace name)</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700">Remote Access (Mobile/PC)</div>
+          <div style="font-size:12px;color:var(--muted)">Access on the same Wi-Fi</div>
+        </div>
+        <div id="settingsLocalIp" style="font-family:ui-monospace,monospace;font-size:13px;background:rgba(0,0,0,0.05);padding:6px 12px;border-radius:8px">...</div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700">Your names</div>
+          <div style="font-size:12px;color:var(--muted)">Shown everywhere instead of the defaults</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="personAInput" style="width:95px" placeholder="Person 1">
+          <input type="text" id="personBInput" style="width:95px" placeholder="Person 2">
+        </div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700">Backup</div>
+          <div style="font-size:12px;color:var(--muted)">Save a copy, or restore everything from a SplitStatement Excel export (a save-point)</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="backupBtn" class="ghost">💾 Back up now</button>
+          <button id="restoreBtn" class="ghost">📂 Restore…</button>
+        </div>
+      </div>
+      <div class="settings-row" style="align-items:flex-start">
+        <div>
+          <div style="font-weight:700">AI assistant <span style="font-size:11px;color:var(--muted)">(optional)</span></div>
+          <div style="font-size:12px;color:var(--muted)" id="aiKeyHint">API key — powers the assistant</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;max-width:340px">
+          <div style="display:flex;gap:6px">
+            <select id="aiProvider" style="width:115px" title="Which AI provider to use">
+              <option value="anthropic">Anthropic</option>
+              <option value="google">Google</option>
+            </select>
+            <input type="password" id="aiKeyInput" style="width:175px" placeholder="API key">
+          </div>
+          <select id="aiModelInput" style="width:296px"
+                  title="Models your key can use. Locked ones aren't available on this key/plan."></select>
+          <span id="aiModelHint" style="font-size:11px;color:var(--muted)"></span>
+          <select id="aiMaxSteps" style="width:296px" title="How many tool steps the assistant may take per question. Higher = handles bigger asks (uses more of your API quota).">
+            <option value="16">Effort: Standard (16 steps)</option>
+            <option value="30">Effort: Deep (30 steps)</option>
+            <option value="50">Effort: Max (50 steps) — big sweeps</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700">Email <span style="font-size:11px;color:var(--muted)">(optional)</span></div>
+          <div style="font-size:12px;color:var(--muted)">SMTP for summaries — e.g. smtp.gmail.com + app password</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;max-width:330px;justify-content:flex-end">
+          <input type="text" id="smtpHost" style="width:140px" placeholder="smtp host">
+          <input type="text" id="smtpPort" style="width:60px" placeholder="587">
+          <input type="text" id="smtpUser" style="width:140px" placeholder="user / from address">
+          <input type="password" id="smtpPass" style="width:110px" placeholder="app password">
+          <input type="text" id="emailTo" style="width:140px" placeholder="send to">
+          <button id="emailTestBtn" class="ghost">✉ Test</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div style="font-weight:700">Due-date reminders</div>
+          <div style="font-size:12px;color:var(--muted)">Email if a card isn't settled near its due date</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <select id="remindDays" style="width:150px">
+            <option value="0">Off</option>
+            <option value="1">24 hours before</option>
+            <option value="2">48 hours before</option>
+            <option value="3">3 days before</option>
+            <option value="5">5 days before</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer"
+                 title="Escalating follow-ups: your lead time, then halfway, then a final 🚨 on the due day itself">
+            <input type="checkbox" id="remindProg" style="width:auto"> annoying mode (keeps nagging)
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="smbtns">
+      <button id="settingsClose" class="primary">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- amazon paste-match modal -->
+<div class="modal" id="amazonModal" hidden>
+  <div class="sheet">
+    <h3 id="amzTitle">Amazon transactions</h3>
+    <p style="margin:0;color:var(--muted);font-size:13px">
+      On Amazon go to <b>Account → Payments → Transactions</b>, select-all, copy, and paste below.
+      Card-funded orders get matched to open charges by amount + date and toggled to
+      <b id="amzWhoLabel"></b>. Gift-card orders are skipped (they never hit the card).
+    </p>
+    <textarea id="amzText" rows="12" placeholder="Paste the whole transactions page here…" style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+    <div class="smbtns">
+      <button id="amzCancel" class="ghost">Cancel</button>
+      <button id="amzGo" class="primary">Match & toggle</button>
+    </div>
+  </div>
+</div>
+
+<!-- card editor (the pencil) -->
+<div class="modal" id="editModal" hidden>
+  <div class="sheet">
+    <h3>Edit card</h3>
+    <label>Name <input id="ecName" type="text"></label>
+    <label>Due day <input id="ecDue" type="number" min="1" max="31" style="width:80px"></label>
+    <label>Bill payer
+      <select id="ecPayer">
+        <option value="Aryn">Aryn pays</option>
+        <option value="Mel">Mel pays</option>
+        <option value="Both">Each pays own</option>
+      </select>
+    </label>
+    <label>Card number endings <input id="ecLast4" type="text" placeholder="1234 or Aryn:11009 Mel:11017"></label>
+    <label>Card type <select id="ecType" title="Picks the look and fills in the reward structure"></select></label>
+    <div id="ecRewards" style="font-size:12px;color:var(--muted);margin:-6px 0 2px 2px"></div>
+    <label>Look <select id="ecSkin" title="Override the look (the card type sets this automatically)"></select></label>
+    <div class="smbtns">
+      <button id="ecCancel" class="ghost">Cancel</button>
+      <button id="ecSave" class="primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI assistant -->
+<button id="aiFab" hidden title="Ask the assistant — investigate charges, find discrepancies, fix buckets">?</button>
+<div id="aiPanel" hidden>
+  <div class="ai-head">
+    <div class="ai-title">
+      <span class="ai-dot"></span>
+      <div>
+        <div class="ai-name">Assistant</div>
+        <div class="ai-sub">knows your cards · can email · can research</div>
+      </div>
+    </div>
+    <button id="aiClose" class="rowbtn" aria-label="Close">✕</button>
+  </div>
+  <div class="ai-chips">
+    <button data-q="Run a fraud check across all cards — research any merchants you don't recognize." title="Fraud check">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.2-7 9.5C8 19.2 5 15.6 5 11V6z"/><path d="M9.5 12l2 2 3.5-4"/></svg>
+      <span class="label">Fraud check</span>
+    </button>
+    <button data-q="Find any balance discrepancies and explain exactly what makes up each one." title="Discrepancies">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5L16 16"/></svg>
+      <span class="label">Discrepancies</span>
+    </button>
+    <button data-q="What's due in the next 7 days, and how much does each of us owe?" title="Due soon">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg>
+      <span class="label">Due soon</span>
+    </button>
+    <button data-q="Rewards check: pull spending stats, find purchases on suboptimal cards, quantify missed cashback in dollars, and check current signup bonuses our spend volume could satisfy." title="Rewards">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0-3.8 10.6c.7.6 1.1 1.4 1.3 2.4h5c.2-1 .6-1.8 1.3-2.4A6 6 0 0 0 12 3z"/><path d="M9.5 19h5M10.5 21.5h3"/></svg>
+      <span class="label">Rewards</span>
+    </button>
+  </div>
+  <div id="aiMsgs"></div>
+  <div id="aiAttach" hidden></div>
+  <div class="ai-inputrow">
+    <button id="aiImgBtn" aria-label="Attach screenshot" title="Attach a screenshot — paste, or click">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5-5L5 20"/></svg>
+    </button>
+    <textarea id="aiInput" rows="1" placeholder="Ask anything, or paste a screenshot…"></textarea>
+    <button id="aiSend" aria-label="Send">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+  <input id="aiImgFile" type="file" accept="image/*" hidden>
+</div>
+
+<!-- catch-up modal -->
+<div class="modal" id="catchupModal" hidden>
+  <div class="sheet">
+    <h3>Catch up — <span id="cuCard"></span></h3>
+    <p style="margin:0;color:var(--muted);font-size:13px">
+      Marks every open charge <b>before</b> a date as already settled. Use this when an import
+      went back months and you'd already paid those cycles outside the app.
+    </p>
+    <label>Settle everything before <input id="cuDate" type="date"></label>
+    <div id="cuHint" style="font-size:12.5px;color:var(--muted)"></div>
+    <div class="smbtns">
+      <button id="cuCancel" class="ghost">Cancel</button>
+      <button id="cuConfirm" class="primary">Mark as settled</button>
+    </div>
+  </div>
+</div>
+
+<!-- sync-from-web paste modal -->
+<div class="modal" id="syncModal" hidden>
+  <div class="sheet">
+    <h3>Sync from Bank Web</h3>
+    <p style="margin:0;color:var(--muted);font-size:13px">
+      Copy the recent/pending charges straight off the bank's website and paste them below.
+      Anything new gets added as a pending charge — when the real statement CSV arrives,
+      it takes over automatically (your buckets and notes stick).
+    </p>
+    <textarea id="syncText" rows="10" placeholder="Paste here…" style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+    <div class="smbtns">
+      <button id="syncCancel" class="ghost">Cancel</button>
+      <button id="syncGo" class="primary">Add charges</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+<input id="receiptFile" type="file" accept="image/*,.pdf" hidden>
+<input id="restoreFile" type="file" accept=".xlsx" hidden>
+
+<script src="app.js"></script>
+</body>
+</html>
