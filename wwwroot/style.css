@@ -96,7 +96,8 @@ main { display: flex; height: calc(100vh - 64px); padding: 0; align-items: stret
 
 /* Top strip: name + badges + due in one flex row â€” nothing can overlap. */
 .tile-top { display: flex; align-items: center; gap: 7px; min-height: 22px; }
-.tile-top .cname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile-top .cname { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile-check { color: #34d399; font-weight: 900; font-size: 14px; flex: 1; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
 
 .card-home { background: #1e293b; color: #fff; display: flex; align-items: center; justify-content: center; }
 .card-home .home-icon { font-size: 50px; opacity: 0.8; }

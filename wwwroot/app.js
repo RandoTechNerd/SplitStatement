@@ -629,9 +629,13 @@ function renderRail() {
     // Statement nudge: due inside 5 days and nothing imported in 2+ weeks.
     const stale = c.dueInDays != null && c.dueInDays <= 5 &&
       (!c.lastImportAt || (Date.now() - new Date(c.lastImportAt)) > 14 * 864e5);
+    // ✓ when settled with no import since (same rule as the Home cards) — clears the moment a new CSV lands.
+    const tms = (s) => s ? new Date(String(s).replace(" ", "T")).getTime() : 0;
+    const settledClean = tms(c.lastSettledAt) > 0 && tms(c.lastSettledAt) >= tms(c.lastImportAt);
     tile.innerHTML = `
       <div class="tile-top">
         <div class="cname">${esc(mask(c.name))}</div>
+        ${settledClean ? `<span class="tile-check" title="Settled — no new charges since">✓</span>` : ""}
         ${!c.cardType ? `<span class="badge unk" title="Card type not set — click to pick it so the look and rewards are right">?</span>` : ""}
         ${stale ? `<span class="nudge" title="Due ${c.dueInDays}d and no fresh import — the statement is probably ready to download">📬</span>` : ""}
         ${c.reviewCount > 0 ? `<span class="badge" title="${c.reviewCount} charge${c.reviewCount === 1 ? "" : "s"} need a review — the app wasn't sure who they belong to. Open the card (or Home) to sort them.">${c.reviewCount}</span>` : ""}
