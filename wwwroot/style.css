@@ -582,6 +582,12 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.7; f
 .editpencil:hover { opacity: 1; }
 .nudge { font-size: 13px; cursor: help; }
 
+/* activity + venmo log rows */
+.actday { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 12px 0 4px; }
+.actrow { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.acttime { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; min-width: 70px; }
+.acticon { width: 18px; text-align: center; }
+
 /* toast */
 #toast {
   position: fixed; left: 24px; bottom: 24px; z-index: 300; max-width: 380px;

@@ -147,13 +147,19 @@ app.MapPatch("/api/txns/{id:long}", async (long id, HttpRequest req) =>
         "SELECT description, bucket FROM txns WHERE id = @id", new { id });
     if (existing == null) return Results.NotFound();
 
+    string shortDesc = existing.Value.description.Length > 32 ? existing.Value.description[..32] : existing.Value.description;
     if (body.Bucket != null)
-        con.Execute("UPDATE txns SET bucket = @b, needs_review = 0 WHERE id = @id",
-                    new { b = body.Bucket, id });
+    {
+        con.Execute("UPDATE txns SET bucket = @b, needs_review = 0 WHERE id = @id", new { b = body.Bucket, id });
+        Log("bucket", $"{shortDesc} → {body.Bucket}");
+    }
     if (body.Note != null)
         con.Execute("UPDATE txns SET note = @n WHERE id = @id", new { n = body.Note, id });
     if (body.Confirm == true)
+    {
         con.Execute("UPDATE txns SET needs_review = 0 WHERE id = @id", new { id });
+        Log("confirm", $"Confirmed {shortDesc} ({existing.Value.bucket})");
+    }
     if (body.Flag == false)
         con.Execute("UPDATE txns SET flag_by = NULL, flag_reason = NULL WHERE id = @id", new { id });
     else if (body.Flag == true)
@@ -200,6 +206,43 @@ app.MapPost("/api/txns", async (HttpRequest req) =>
                    b.Bucket, b.Note, b.Source, hash,
                    review = b.Source == "sync" ? 1 : 0 });   // web-pasted rows get a once-over
     return Results.Json(new { duplicate = false });
+});
+
+// Running activity history for the Home screen.
+app.MapGet("/api/activity", () =>
+{
+    using var con = Db.Open();
+    return Results.Json(con.Query("SELECT at, kind, detail FROM activity ORDER BY id DESC LIMIT 400"));
+});
+
+// Every venmo line ever recorded in a settle-up, with timestamps — the venmo archive.
+app.MapGet("/api/venmos", () =>
+{
+    using var con = Db.Open();
+    var rows = con.Query<(long id, long? cardId, string? label, string settledAt, string? payments)>(
+        "SELECT id, card_id, label, settled_at, payments FROM settlements WHERE payments LIKE '%venmo%' ORDER BY settled_at DESC");
+    var result = new List<object>();
+    foreach (var s in rows)
+    {
+        List<Dictionary<string, JsonElement>> pays;
+        try { pays = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(s.payments ?? "[]") ?? new(); }
+        catch { continue; }
+        foreach (var p in pays)
+        {
+            string method = p.TryGetValue("method", out var m) ? m.GetString() ?? "" : "";
+            if (!method.Contains("venmo")) continue;
+            result.Add(new
+            {
+                card = s.cardId == null ? "?" : CardName(s.cardId.Value),
+                label = s.label, at = s.settledAt,
+                who = p.TryGetValue("who", out var w) ? w.GetString() : "?",
+                method,
+                amount = p.TryGetValue("amount", out var a) ? a.GetDouble() : 0,
+                note = p.TryGetValue("note", out var n) ? n.GetString() : "",
+            });
+        }
+    }
+    return Results.Json(result);
 });
 
 // Everything flagged for review, across all cards — feeds the Home screen queue.
@@ -291,6 +334,43 @@ app.MapPost("/api/settings", async (HttpRequest req) =>
     return Results.Ok();
 });
 
+// ---------- saved AI keys (a little keyring you can pick from) ----------
+app.MapGet("/api/ai/saved", () =>
+    Results.Json(LoadKeyring().Select(k => new { k.Label, k.Provider })));   // never expose key values
+
+app.MapPost("/api/ai/saved", async (HttpRequest req) =>
+{
+    var b = await req.ReadFromJsonAsync<SavedKeyBody>();
+    if (string.IsNullOrWhiteSpace(b?.Label)) return Results.BadRequest();
+    string prov = GetMeta("ai_provider") ?? "anthropic";
+    string key = GetMeta($"ai_key_{prov}") ?? "";
+    if (key.Length == 0) return Results.Json(new { saved = false, error = "no active key to save — paste one first" });
+    var ring = LoadKeyring();
+    ring.RemoveAll(k => k.Label.Equals(b.Label, StringComparison.OrdinalIgnoreCase));
+    ring.Add(new AiKey(b.Label.Trim(), prov, key));
+    SaveKeyring(ring);
+    return Results.Json(new { saved = true });
+});
+
+app.MapPost("/api/ai/saved/use", async (HttpRequest req) =>
+{
+    var b = await req.ReadFromJsonAsync<SavedKeyBody>();
+    var entry = LoadKeyring().FirstOrDefault(k => k.Label.Equals(b?.Label, StringComparison.OrdinalIgnoreCase));
+    if (entry == null) return Results.NotFound();
+    SetMeta("ai_provider", entry.Provider);
+    SetMeta($"ai_key_{entry.Provider}", entry.Key);
+    SetMeta("ai_model", "");
+    return Results.Json(new { active = entry.Label, provider = entry.Provider });
+});
+
+app.MapDelete("/api/ai/saved/{label}", (string label) =>
+{
+    var ring = LoadKeyring();
+    ring.RemoveAll(k => k.Label.Equals(label, StringComparison.OrdinalIgnoreCase));
+    SaveKeyring(ring);
+    return Results.Ok();
+});
+
 // SMTP: send a themed test message showcasing the email design.
 app.MapPost("/api/email/test", () =>
 {
@@ -365,6 +445,7 @@ app.MapPost("/api/txns/{id:long}/make-payment", (long id) =>
     SetMeta($"detected_pay:{row.Value.cardId}",
         JsonSerializer.Serialize(list, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
     con.Execute("DELETE FROM txns WHERE id = @id", new { id });
+    Log("payment", $"Moved {row.Value.desc[..Math.Min(32, row.Value.desc.Length)]} to payments on {CardName(row.Value.cardId)}");
     return Results.Ok();
 });
 
@@ -495,6 +576,8 @@ app.MapPost("/api/scan", () =>
     }
     if (results.Count == 0)
         results.Add(new { file = folder, card = (string?)null, error = "no statement files found here" });
+    int imported = results.Count(r => r.GetType().GetProperty("card")?.GetValue(r) != null);
+    if (imported > 0) Log("scan", $"Folder scan imported {imported} statement file(s)");
     return Results.Json(results);
 });
 
@@ -636,6 +719,7 @@ app.MapPost("/api/cards/{id:long}/bulk-settle-before", (long id, HttpRequest req
         """, new { sid, id, date }, tx);
         
     tx.Commit();
+    Log("catchup", $"Caught up {CardName(id)} — charges before {date} marked settled");
     return Results.Ok(new { settlementId = sid });
 });
 
@@ -707,6 +791,7 @@ app.MapPost("/api/cards/{id:long}/balance", async (long id, HttpRequest req) =>
                          stmt_balance_at = CASE WHEN @bal IS NULL THEN NULL ELSE datetime('now') END
         WHERE id = @id
         """, new { id, bal = b?.Balance });
+    if (b?.Balance != null) Log("balance", $"Set {CardName(id)} current balance ${b.Balance:0.00}");
     return Results.Ok();
 });
 
@@ -751,6 +836,7 @@ app.MapPost("/api/cards/{id:long}/settle", async (long id, HttpRequest req) =>
     }
     catch { /* export is a bonus, never a blocker */ }
 
+    Log("settle", $"Settled {CardName(id)} ({b.Label}) — {GetMeta("person_b") ?? "Mel"} ${melPart:0.00}, {GetMeta("person_a") ?? "Aryn"} ${arynPart:0.00}");
     return Results.Json(new { settlementId = sid, melPart, arynPart });
 });
 
@@ -814,6 +900,7 @@ app.MapPost("/api/settlements/{id:long}/confirm-payment", async (long id, HttpRe
         : d.ToDictionary(kv => kv.Key, kv => (object)kv.Value)).ToList();
     con.Execute("UPDATE settlements SET payments = @p WHERE id = @id",
                 new { p = JsonSerializer.Serialize(rebuilt), id });
+    Log("venmo", $"Marked a venmo received ({entry.GetValueOrDefault("who")} ${entry.GetValueOrDefault("amount")})");
     return Results.Ok();
 });
 
@@ -873,6 +960,7 @@ app.MapPost("/api/restore", async (HttpRequest req) =>
     {
         using var s = file.OpenReadStream();
         var (cards, txns, settlements) = BackupService.Restore(s);
+        Log("restore", $"Restored from backup — {cards} cards, {txns} transactions, {settlements} settle-ups");
         return Results.Json(new { restored = true, cards, txns, settlements });
     }
     catch (Exception ex) { return Results.Json(new { restored = false, error = ex.Message }); }
@@ -1106,6 +1194,20 @@ static string? PeekText(string fileName, byte[] bytes)
     return text.Length > 6000 ? text[..6000] : text;
 }
 
+static List<AiKey> LoadKeyring()
+{
+    var json = GetMeta("ai_keyring");
+    if (string.IsNullOrEmpty(json)) return new();
+    try { return JsonSerializer.Deserialize<List<AiKey>>(json) ?? new(); } catch { return new(); }
+}
+static void SaveKeyring(List<AiKey> ring) => SetMeta("ai_keyring", JsonSerializer.Serialize(ring));
+
+static void Log(string kind, string detail)
+{
+    try { using var con = Db.Open(); con.Execute("INSERT INTO activity (kind, detail) VALUES (@kind, @detail)", new { kind, detail }); }
+    catch { /* logging must never break the action */ }
+}
+
 static string CardName(long id)
 {
     using var con = Db.Open();
@@ -1244,6 +1346,8 @@ record SettingsBody(string? StatementsFolder, string? ArynBank = null, string? M
 record AmazonBody(string Who, string Text);
 record ConfirmBody(int Index);
 record AiChatBody(List<ChatMsg> Messages);
+record SavedKeyBody(string? Label);
+record AiKey(string Label, string Provider, string Key);
 record CardPatch(string? Name = null, int? DueDay = null, string? Color = null,
                  string? DefaultBucket = null, string? DefaultPayer = null,
                  double? CarryMel = null, double? CarryAryn = null, string? Note = null,

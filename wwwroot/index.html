@@ -43,7 +43,9 @@
     <div id="summaryView" hidden>
       <div class="summary-header">
         <h1>Overview</h1>
-        <div style="display:flex;gap:10px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button id="activityBtn" class="ghost">🕘 Activity</button>
+          <button id="venmoBtn" class="ghost">↔ Venmo log</button>
           <button id="insightsBtn" class="ghost" hidden>💡 Insights</button>
           <button id="addCardBtn" class="ghost">+ Add card</button>
           <button id="batchScanBtn" class="primary">🔍 Scan Folder for Statements</button>
@@ -283,6 +285,11 @@
             <option value="30">Effort: Deep (30 steps)</option>
             <option value="50">Effort: Max (50 steps) — big sweeps</option>
           </select>
+          <div style="display:flex;gap:6px;width:296px">
+            <input type="text" id="saveKeyLabel" style="flex:1" placeholder="label this key (e.g. My Gemini)">
+            <button id="saveKeyBtn" class="ghost" style="white-space:nowrap">💾 Save</button>
+          </div>
+          <div id="savedKeys" style="width:296px;display:flex;flex-direction:column;gap:4px"></div>
         </div>
       </div>
       <div class="settings-row">
@@ -442,6 +449,26 @@
       <button id="syncCancel" class="ghost">Cancel</button>
       <button id="syncGo" class="primary">Add charges</button>
     </div>
+  </div>
+</div>
+
+<!-- activity log -->
+<div class="modal" id="activityModal" hidden>
+  <div class="sheet">
+    <h3>🕘 Activity history</h3>
+    <p style="margin:0;color:var(--muted);font-size:13px">A running log of changes — handy if something looks off or you need to retrace steps.</p>
+    <div id="activityBody" style="max-height:55vh;overflow:auto"></div>
+    <div class="smbtns"><button id="activityClose" class="primary">Done</button></div>
+  </div>
+</div>
+
+<!-- venmo log -->
+<div class="modal" id="venmoModal" hidden>
+  <div class="sheet">
+    <h3>↔ Venmo log</h3>
+    <p style="margin:0;color:var(--muted);font-size:13px">Every venmo recorded in a settle-up, newest first.</p>
+    <div id="venmoBody" style="max-height:55vh;overflow:auto"></div>
+    <div class="smbtns"><button id="venmoClose" class="primary">Done</button></div>
   </div>
 </div>
 

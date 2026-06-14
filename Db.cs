@@ -80,6 +80,14 @@ public static class Db
             );
 
             CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+
+            -- Running history of actions, so you can see what happened when.
+            CREATE TABLE IF NOT EXISTS activity (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                at TEXT DEFAULT (datetime('now','localtime')),
+                kind TEXT,
+                detail TEXT
+            );
             """;
         cmd.ExecuteNonQuery();
 

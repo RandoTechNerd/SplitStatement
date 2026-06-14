@@ -160,6 +160,7 @@ $("#settingsBtn").onclick = async (e) => {
     $("#aiMaxSteps").value = s.aiMaxSteps || "16";
     if (s.aiKeySet) refreshModels(prov, s.aiModel || "");
     else $("#aiModelHint").textContent = "add a key to see available models";
+    renderSavedKeys();
     $("#smtpHost").value = s.smtpHost || "";
     $("#smtpPort").value = s.smtpPort || "";
     $("#smtpUser").value = s.smtpUser || "";
@@ -224,6 +225,41 @@ $("#aiKeyInput").onchange = async (e) => {
 $("#aiMaxSteps").onchange = (e) => {
   saveSetting({ aiMaxSteps: e.target.value });
   toast(`Assistant effort: ${e.target.options[e.target.selectedIndex].text.replace("Effort: ", "")}`);
+};
+
+// ---------- saved AI keys (keyring) ----------
+async function renderSavedKeys() {
+  const el = $("#savedKeys");
+  if (!el) return;
+  const keys = await (await fetch("/api/ai/saved")).json().catch(() => []);
+  el.innerHTML = keys.length ? "" : `<span style="font-size:11px;color:var(--muted)">No saved keys yet — paste a key above, then 💾 Save it with a label.</span>`;
+  for (const k of keys) {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:6px;align-items:center;font-size:12px";
+    row.innerHTML = `<span style="flex:1">🔑 ${esc(k.label)} <span style="color:var(--muted)">(${esc(k.provider)})</span></span>
+      <button class="ghost usekey" style="padding:3px 9px">Use</button>
+      <button class="ghost delkey" style="padding:3px 8px">✕</button>`;
+    row.querySelector(".usekey").onclick = async () => {
+      const r = await (await fetch("/api/ai/saved/use", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: k.label }) })).json();
+      toast(`Now using "${esc(k.label)}" (${esc(r.provider)}).`);
+      const s = await (await fetch("/api/settings")).json();
+      $("#aiProvider").value = s.aiProvider; aiAvailableModels = null; aiAvailable = !!s.aiKeySet;
+      $("#aiFab").hidden = !aiAvailable; $("#insightsBtn").hidden = !aiAvailable;
+      await refreshModels(s.aiProvider, "");
+    };
+    row.querySelector(".delkey").onclick = async () => {
+      await fetch(`/api/ai/saved/${encodeURIComponent(k.label)}`, { method: "DELETE" });
+      renderSavedKeys();
+    };
+    el.appendChild(row);
+  }
+}
+$("#saveKeyBtn").onclick = async () => {
+  const label = $("#saveKeyLabel").value.trim();
+  if (!label) { toast("Give the key a label first."); return; }
+  const r = await (await fetch("/api/ai/saved", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label }) })).json();
+  if (r.saved) { $("#saveKeyLabel").value = ""; toast(`Saved "${esc(label)}" to your keyring.`); renderSavedKeys(); }
+  else toast(r.error || "couldn't save");
 };
 $("#aiModelInput").onchange = (e) => {
   if (e.target.value === "__custom__") {
@@ -305,12 +341,15 @@ document.querySelectorAll(".theme-btn").forEach(btn => {
 
 // ---------- data ----------
 async function refresh(keepTxns = false) {
+  const panel = $("#panel");
+  const savedScroll = panel ? panel.scrollTop : 0;   // don't jump to top on in-place edits
   state = await (await fetch("/api/state")).json();
   renderNet();
   renderRail();
   if (selectedId && state.cards.some(c => c.id === selectedId)) {
     renderCardHeader();
     if (!keepTxns) await loadTxns();
+    if (panel) panel.scrollTop = savedScroll;
     updateMemoDisplay();
   } else {
     selectedId = null;
@@ -492,6 +531,46 @@ $("#addCardBtn").onclick = async () => {
   toast(`${esc(mask(name.trim()))} added — double-click its number area to set the last 4, and import a statement to teach it.`);
   await refresh();
 };
+
+// ---------- activity history ----------
+$("#activityBtn").onclick = async () => {
+  $("#activityModal").hidden = false;
+  const el = $("#activityBody");
+  el.innerHTML = "<div style='color:var(--muted);padding:12px'>loading…</div>";
+  const rows = await (await fetch("/api/activity")).json();
+  if (!rows.length) { el.innerHTML = "<div style='color:var(--muted);padding:12px'>No activity logged yet.</div>"; return; }
+  const icon = { settle: "✅", catchup: "🧹", bucket: "🏷", confirm: "✓", balance: "⚖", scan: "📥",
+                 restore: "📂", payment: "💳", venmo: "↔", import: "📥" };
+  let lastDay = "", html = "";
+  for (const r of rows) {
+    const day = (r.at || "").slice(0, 10), time = (r.at || "").slice(11, 16);
+    if (day !== lastDay) { html += `<div class="actday">${esc(day)}</div>`; lastDay = day; }
+    html += `<div class="actrow"><span class="acttime">${esc(time)}</span>
+      <span class="acticon">${icon[r.kind] || "•"}</span>
+      <span>${esc(mask(r.detail || r.kind))}</span></div>`;
+  }
+  el.innerHTML = html;
+};
+$("#activityClose").onclick = () => $("#activityModal").hidden = true;
+
+// ---------- venmo log ----------
+$("#venmoBtn").onclick = async () => {
+  $("#venmoModal").hidden = false;
+  const el = $("#venmoBody");
+  el.innerHTML = "<div style='color:var(--muted);padding:12px'>loading…</div>";
+  const rows = await (await fetch("/api/venmos")).json();
+  if (!rows.length) { el.innerHTML = "<div style='color:var(--muted);padding:12px'>No venmos recorded yet.</div>"; return; }
+  el.innerHTML = rows.map(v => {
+    const status = (v.method || "").includes("received") ? "✓ received"
+      : (v.method || "").includes("requested") ? "⏳ requested" : "→ sent";
+    return `<div class="actrow"><span class="acttime">${esc((v.at || "").slice(0, 10))}</span>
+      <span class="rqcard">${esc(mask(v.card))}</span>
+      <span style="flex:1">${esc(whoName(v.who, true))} · ${esc(status)}${v.note ? " · " + esc(mask(v.note)) : ""}</span>
+      <b>${fmt(v.amount)}</b></div>`;
+  }).join("");
+};
+$("#venmoClose").onclick = () => $("#venmoModal").hidden = true;
+[$("#activityModal"), $("#venmoModal")].forEach(m => m.addEventListener("click", e => { if (e.target === m) m.hidden = true; }));
 
 $("#batchScanBtn").onclick = async () => {
   const btn = $("#batchScanBtn");
