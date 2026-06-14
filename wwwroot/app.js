@@ -400,13 +400,29 @@ function renderSummary() {
 
   const grid = $("#summaryCards");
   grid.innerHTML = "";
+  const ms = (s) => s ? new Date(String(s).replace(" ", "T")).getTime() : 0;
   for (const c of state.cards) {
+    const settledMs = ms(c.lastSettledAt), importMs = ms(c.lastImportAt);
+    // ✓ when settled and nothing imported since (a fresh CSV clears the checkmark).
+    const settledClean = settledMs > 0 && settledMs >= importMs;
+    // Red oval: due within a week AND not settled in the ~month before that due date.
+    const dueMs = c.dueInDays != null ? Date.now() + c.dueInDays * 864e5 : 0;
+    const overdueRisk = c.dueInDays != null && c.dueInDays <= 7 && settledMs < dueMs - 31 * 864e5;
+    const settledDate = c.lastSettledAt ? String(c.lastSettledAt).slice(0, 10) : "";
+
     const div = document.createElement("button");
     div.className = "sum-card";
-    div.innerHTML = `<h3>${esc(mask(c.name))} <span class="editpencil" title="Edit this card">✎</span></h3>
+    div.innerHTML = `
+      <div class="sum-head">
+        <h3>${esc(mask(c.name))}${settledClean ? ` <span class="sum-check" title="Settled — no new imports since">✓</span>` : ""}
+            <span class="editpencil" title="Edit this card">✎</span></h3>
+        ${settledDate ? `<span class="sum-settled" title="Last settled">settled ${esc(settledDate)}</span>` : ""}
+      </div>
       <div class="sum-stats">
         <div><span>Open charges</span><b>${fmt(c.openTotal)}</b></div>
-        <div><span>Due</span><b>${c.dueDay ? `${ord(c.dueDay)} (in ${c.dueInDays}d)` : "—"}</b></div>
+        <div><span>Due</span><b>${c.dueDay
+          ? `<span class="sum-due${overdueRisk ? " overdue" : ""}" title="${overdueRisk ? "Due soon and not settled recently" : ""}">${ord(c.dueDay)} · ${c.dueInDays}d</span>`
+          : "—"}</b></div>
         <div><span>${esc(whoName("Mel"))}'s part</span><b>${fmt(c.melPart)}</b></div>
         <div><span>${esc(whoName("Aryn"))}'s part</span><b>${fmt(c.arynPart)}</b></div>
         ${c.reviewCount ? `<div><span>Needs review</span><b style="color:var(--warn)">${c.reviewCount}</b></div>` : ""}
