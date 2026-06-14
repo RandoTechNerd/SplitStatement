@@ -403,8 +403,9 @@ function renderSummary() {
   const ms = (s) => s ? new Date(String(s).replace(" ", "T")).getTime() : 0;
   for (const c of state.cards) {
     const settledMs = ms(c.lastSettledAt), importMs = ms(c.lastImportAt);
-    // ✓ when settled and nothing imported since (a fresh CSV clears the checkmark).
-    const settledClean = settledMs > 0 && settledMs >= importMs;
+    // ✓ = settled, nothing imported since, AND nothing left open (a partial catch-up that
+    // leaves charges open shouldn't look "done"; a fresh CSV also clears it).
+    const settledClean = settledMs > 0 && settledMs >= importMs && Math.abs(c.openTotal) < 0.01;
     // Red oval: due within a week AND not settled since the PREVIOUS due date (one cycle back).
     let overdueRisk = false;
     if (c.dueInDays != null && c.dueInDays <= 7) {
@@ -629,9 +630,9 @@ function renderRail() {
     // Statement nudge: due inside 5 days and nothing imported in 2+ weeks.
     const stale = c.dueInDays != null && c.dueInDays <= 5 &&
       (!c.lastImportAt || (Date.now() - new Date(c.lastImportAt)) > 14 * 864e5);
-    // ✓ when settled with no import since (same rule as the Home cards) — clears the moment a new CSV lands.
+    // ✓ when settled, nothing imported since, and nothing left open (same rule as Home cards).
     const tms = (s) => s ? new Date(String(s).replace(" ", "T")).getTime() : 0;
-    const settledClean = tms(c.lastSettledAt) > 0 && tms(c.lastSettledAt) >= tms(c.lastImportAt);
+    const settledClean = tms(c.lastSettledAt) > 0 && tms(c.lastSettledAt) >= tms(c.lastImportAt) && Math.abs(c.openTotal) < 0.01;
     tile.innerHTML = `
       <div class="tile-top">
         <div class="cname">${esc(mask(c.name))}</div>
