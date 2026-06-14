@@ -405,9 +405,14 @@ function renderSummary() {
     const settledMs = ms(c.lastSettledAt), importMs = ms(c.lastImportAt);
     // ✓ when settled and nothing imported since (a fresh CSV clears the checkmark).
     const settledClean = settledMs > 0 && settledMs >= importMs;
-    // Red oval: due within a week AND not settled in the ~month before that due date.
-    const dueMs = c.dueInDays != null ? Date.now() + c.dueInDays * 864e5 : 0;
-    const overdueRisk = c.dueInDays != null && c.dueInDays <= 7 && settledMs < dueMs - 31 * 864e5;
+    // Red oval: due within a week AND not settled since the PREVIOUS due date (one cycle back).
+    let overdueRisk = false;
+    if (c.dueInDays != null && c.dueInDays <= 7) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const upcomingDue = new Date(today.getTime() + c.dueInDays * 864e5);
+      const prevDue = new Date(upcomingDue); prevDue.setMonth(prevDue.getMonth() - 1);
+      overdueRisk = settledMs < prevDue.getTime();
+    }
     const settledDate = c.lastSettledAt ? String(c.lastSettledAt).slice(0, 10) : "";
 
     const div = document.createElement("button");
